@@ -216,28 +216,34 @@
     <div id="ticketModal" class="modal">
         <div class="modal-content ticket-receipt">
             <span class="close-modal" id="closeTicketModal">&times;</span>
-            <div class="ticket-header">
-                <h2>🎟️ Ticket #<span id="ticketNumberDisplay"></span></h2>
-                <p>El puesto de Don Juan</p>
-            </div>
-            <div class="ticket-body">
-                <p><strong>Cliente:</strong> <span id="ticketCustomerName"></span></p>
-                <p><strong>Pago:</strong> <span id="ticketPaymentMethodDisplay"
-                        style="font-weight: bold; color: var(--accent-color);"></span></p>
-                <p
-                    style="margin-top: 0.5rem; margin-bottom: 1rem; background-color: #f0f0f0; padding: 5px; border-radius: 5px;">
-                    <strong>Estado:</strong> <span id="ticketStatusDisplay"
-                        style="font-weight: bold; color: #d94f04;">Esperando Confirmación</span></p>
-                <div class="ticket-items" id="ticketItemsDisplay"></div>
-                <div class="ticket-total">
-                    <h3>Total: <span id="ticketTotalDisplay"></span></h3>
+            <!-- Wrap receipt details in a capture block so the screenshot looks clean -->
+            <div id="ticketReceiptCapture" style="padding: 10px; background: #ffffff; border-radius: 8px;">
+                <div class="ticket-header">
+                    <h2>🎟️ Ticket #<span id="ticketNumberDisplay"></span></h2>
+                    <p>El puesto de Don Juan</p>
                 </div>
-                <div id="qrCodeContainer" style="text-align: center; margin-top: 20px;">
-                    <img id="ticketQrCode" src="" alt="Código QR del Ticket"
-                        style="max-width: 150px; display: inline-block; border-radius: 8px;">
+                <div class="ticket-body">
+                    <p><strong>Cliente:</strong> <span id="ticketCustomerName"></span></p>
+                    <p><strong>Pago:</strong> <span id="ticketPaymentMethodDisplay"
+                            style="font-weight: bold; color: var(--accent-color);"></span></p>
+                    <p
+                        style="margin-top: 0.5rem; margin-bottom: 1rem; background-color: #f0f0f0; padding: 5px; border-radius: 5px;">
+                        <strong>Estado:</strong> <span id="ticketStatusDisplay"
+                            style="font-weight: bold; color: #d94f04;">Esperando Confirmación</span></p>
+                    <div class="ticket-items" id="ticketItemsDisplay"></div>
+                    <div class="ticket-total">
+                        <h3>Total: <span id="ticketTotalDisplay"></span></h3>
+                    </div>
+                    <div id="qrCodeContainer" style="text-align: center; margin-top: 20px;">
+                        <img id="ticketQrCode" src="" alt="Código QR del Ticket"
+                            style="max-width: 150px; display: inline-block; border-radius: 8px;">
+                    </div>
                 </div>
             </div>
             <button class="btn-primary w-100 mt-4" id="printTicketBtn">🖨️ Imprimir Ticket</button>
+            <button class="btn-primary w-100 mt-2" id="whatsappTicketBtn" style="background-color: #25D366; color: white;">
+                Envialo a nuestro WhatsApp
+            </button>
         </div>
     </div>
 
