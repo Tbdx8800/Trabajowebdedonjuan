@@ -734,11 +734,32 @@ button {
         height: auto;
     }
     
+    .logo {
+        flex-direction: column;
+        text-align: center;
+        gap: 8px;
+    }
+    
+    #main-logo {
+        height: 70px;
+    }
+    
+    .logo h1 {
+        font-size: 1.1rem;
+        text-align: center;
+        line-height: 1.2;
+    }
+    
     .controls {
         width: 100%;
         justify-content: center;
         flex-wrap: wrap;
         gap: 0.8rem;
+    }
+    
+    .controls button {
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
     }
     
     .app-main {
@@ -772,22 +793,6 @@ button {
         justify-content: center;
     }
     
-    .logo {
-        flex-direction: column;
-        text-align: center;
-        gap: 8px;
-    }
-    
-    #main-logo {
-        height: 70px;
-    }
-    
-    .logo h1 {
-        font-size: 1.1rem; /* Smaller font for mobile */
-        text-align: center;
-        line-height: 1.2;
-    }
-    
     .mode-label {
         font-size: 0.9rem;
     }
@@ -802,13 +807,32 @@ button {
         padding: 1.5rem;
     }
     
-    .controls {
-        flex-direction: column;
-        align-items: center;
-    }
+    
     
     #viewTicketsBtn {
         width: 100%;
         text-align: center;
     }
 }
+
+/* Admin Dropdown Menu */
+.admin-dropdown {
+    display: none;
+    position: absolute;
+    top: 110%;
+    right: 0;
+    background: var(--surface-color);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    padding: 1rem;
+    width: 220px;
+    z-index: 200;
+    flex-direction: column;
+    gap: 0.8rem;
+    animation: fadeIn 0.2s ease;
+}
+.admin-dropdown.show {
+    display: flex !important;
+}
+

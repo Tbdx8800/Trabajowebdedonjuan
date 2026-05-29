@@ -17,17 +17,28 @@
             <img src="dj.jpeg" alt="Logo Don Juan" id="main-logo">
             <h1>El puesto de Don Juan</h1>
         </div>
-        <div class="controls" style="display: flex; align-items: center; gap: 1.5rem;">
-            <div id="adminControls" style="display: none; align-items: center; gap: 1.5rem;">
-                <span class="mode-label" id="modeLabel">Turno Abierto</span>
-                <label class="switch">
-                    <input type="checkbox" id="modeToggle">
-                    <span class="slider round"></span>
-                </label>
-                <button id="openDashboardBtn" class="btn-primary" style="background-color: var(--accent-color);">👨‍🍳 Dashboard</button>
-                <button id="viewTicketsBtn" class="btn-secondary">🧾 Ver Tickets</button>
-                <button id="logoutBtn" class="btn-secondary" style="background-color: var(--danger-color);">Salir</button>
+        <div class="controls" style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+            <button id="howToUseBtn" class="btn-primary" style="background-color: var(--accent-color); display: flex; align-items: center; gap: 5px;">❓ ¿Cómo usar?</button>
+            
+            <!-- Menú Desplegable para Administrador -->
+            <div id="adminControls" style="display: none; position: relative;">
+                <button id="adminMenuToggleBtn" class="btn-secondary" style="background-color: var(--secondary-color); display: flex; align-items: center; gap: 8px; padding: 0.6rem 1.2rem; font-size: 0.95rem;">
+                    ☰ Menú Admin
+                </button>
+                <div id="adminDropdownMenu" class="admin-dropdown">
+                    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px dashed var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.2rem; width: 100%;">
+                        <span class="mode-label" id="modeLabel" style="font-size: 0.95rem;">Turno Abierto</span>
+                        <label class="switch" style="transform: scale(0.85); transform-origin: right center;">
+                            <input type="checkbox" id="modeToggle">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <button id="openDashboardBtn" class="btn-primary" style="background-color: var(--accent-color); font-size: 0.95rem; width: 100%; text-align: left; padding: 0.6rem 1rem;">👨‍🍳 Dashboard</button>
+                    <button id="viewTicketsBtn" class="btn-secondary" style="width: 100%; text-align: left; padding: 0.6rem 1rem; color: white;">🧾 Ver Tickets</button>
+                    <button id="logoutBtn" class="btn-secondary" style="background-color: var(--danger-color); width: 100%; text-align: left; padding: 0.6rem 1rem; color: white;">Salir</button>
+                </div>
             </div>
+
             <button id="openLoginBtn" class="btn-primary" style="background-color: var(--secondary-color);">Acceder</button>
         </div>
     </header>
@@ -119,6 +130,7 @@
                 <div class="ticket-body" style="font-size: 1.1rem; line-height: 1.6;">
                     <p><strong>Ticket #:</strong> <span id="resumenNumber"></span></p>
                     <p><strong>Cliente:</strong> <span id="resumenCustomer"></span></p>
+                    <p><strong>Pago:</strong> <span id="resumenPaymentMethod" style="font-weight: bold; color: var(--accent-color);"></span class="payment-method-text"></p>
                     <p style="margin-top: 0.5rem; background-color: #f0f0f0; padding: 5px 10px; border-radius: 5px;"><strong>Estado Actual:</strong> <span id="resumenStatus" style="font-weight: bold; color: #d94f04;">Esperando Confirmación</span></p>
                     <div class="ticket-items" id="resumenItems"
                         style="margin-top: 1.5rem; border-top: 1px solid #ccc; padding-top: 1rem;"></div>
@@ -175,6 +187,7 @@
             </div>
             <div class="ticket-body">
                 <p><strong>Cliente:</strong> <span id="ticketCustomerName"></span></p>
+                <p><strong>Pago:</strong> <span id="ticketPaymentMethodDisplay" style="font-weight: bold; color: var(--accent-color);"></span></p>
                 <p style="margin-top: 0.5rem; margin-bottom: 1rem; background-color: #f0f0f0; padding: 5px; border-radius: 5px;"><strong>Estado:</strong> <span id="ticketStatusDisplay" style="font-weight: bold; color: #d94f04;">Esperando Confirmación</span></p>
                 <div class="ticket-items" id="ticketItemsDisplay"></div>
                 <div class="ticket-total">
@@ -236,6 +249,54 @@
             </form>
         </div>
     </div>
+
+    <!-- Modal Método de Pago -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content" style="text-align: center; max-width: 400px; padding: 2rem;">
+            <span class="close-modal" id="closePaymentModal">&times;</span>
+            <h2 style="margin-bottom: 1.5rem; color: var(--secondary-color);">Método de Pago</h2>
+            <p style="color: var(--text-light); margin-bottom: 1.5rem; font-size: 0.95rem;">Selecciona cómo deseas realizar tu pago:</p>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <button class="btn-primary payment-option-btn" data-method="Efectivo" style="background-color: var(--accent-color); font-size: 1.1rem; padding: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 10px;">💵 Efectivo</button>
+                <button class="btn-primary payment-option-btn" data-method="Tarjeta (Terminal)" style="background-color: var(--secondary-color); font-size: 1.1rem; padding: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 10px;">💳 Tarjeta (Terminal)</button>
+                <button class="btn-primary payment-option-btn" data-method="Transferencia" style="background-color: var(--primary-color); font-size: 1.1rem; padding: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 10px;">📲 Transferencia</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal ¿Cómo usar el sitio? -->
+    <div id="howToUseModal" class="modal">
+        <div class="modal-content" style="max-width: 600px; padding: 2.5rem; text-align: center; max-height: 90vh; overflow-y: auto;">
+            <span class="close-modal" id="closeHowToUseModal">&times;</span>
+            <h2 style="margin-bottom: 1.5rem; color: var(--secondary-color);">🎥 ¿Cómo usar el sitio de reservas?</h2>
+            
+            <!-- Video Tutorial Container -->
+            <div class="video-container" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #2b1c13; border-radius: var(--radius-md); margin-bottom: 1.5rem; box-shadow: var(--shadow-md);">
+                <!-- Colocar etiqueta iframe o video aquí en el futuro -->
+                <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; padding: 20px; box-sizing: border-box; background: linear-gradient(135deg, #3b2113 0%, #c94022 100%);">
+                    <span style="font-size: 3.5rem; margin-bottom: 10px; animation: pulse 2s infinite;">🎞️</span>
+                    <p style="font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; color: var(--surface-color);">Tutorial Próximamente</p>
+                    <p style="font-size: 0.9rem; opacity: 0.9; text-align: center; max-width: 300px;">Aquí se reproducirá el video explicativo sobre cómo usar el sitio de reservas.</p>
+                </div>
+            </div>
+
+            <div style="text-align: left; line-height: 1.6; color: var(--text-color); margin-bottom: 1.5rem;">
+                <h3 style="margin-bottom: 0.6rem; font-size: 1.1rem; color: var(--secondary-color); border-bottom: 1px dashed var(--border-color); padding-bottom: 0.3rem;">Pasos rápidos para reservar:</h3>
+                <ol style="margin-left: 1.25rem; font-size: 0.95rem; display: flex; flex-direction: column; gap: 0.4rem;">
+                    <li>Selecciona tus alimentos favoritos del <strong>Menú del Día</strong>.</li>
+                    <li>Personaliza las opciones de preparación para platillos preparados (sin, normal o extra ingredientes).</li>
+                    <li>Ingresa tu nombre en el panel del pedido y haz clic en <strong>Confirmar Reserva</strong>.</li>
+                    <li>Selecciona tu <strong>Método de Pago</strong> preferido.</li>
+                    <li>¡Listo! Guarda tu <strong>Código QR</strong> generado o captura de pantalla para consultar el estado en tiempo real.</li>
+                </ol>
+            </div>
+            <button class="btn-primary w-100" id="closeHowToUseModalBtn">¡Entendido!</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
     <script src="app.js"></script>
 </body>

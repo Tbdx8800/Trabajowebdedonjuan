@@ -5,6 +5,107 @@ let cart = {};
 let isCerrado = false;
 let editingProductId = null;
 
+// Firebase Integration Config & State
+const firebaseConfig = {
+    apiKey: "AIzaSyBHTh1VTHG_On49AOoKyp3ervp8SgXhoVM",
+    authDomain: "donjuan-121d0.firebaseapp.com",
+    projectId: "donjuan-121d0",
+    storageBucket: "donjuan-121d0.firebasestorage.app",
+    messagingSenderId: "517816845917",
+    appId: "1:517816845917:web:8be0952624dd4e6c04afb4",
+    measurementId: "G-B3W54VN4KL"
+};
+
+let db = null;
+let useFirebase = false;
+
+// Initialize Firebase
+function initFirebase() {
+    try {
+        if (typeof firebase !== 'undefined') {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            useFirebase = true;
+        } else {
+            console.warn("Firebase SDK not loaded, using localStorage fallback.");
+            useFirebase = false;
+        }
+    } catch (error) {
+        console.error("Error initializing Firebase:", error);
+        useFirebase = false;
+    }
+}
+
+// Sync menu with Firebase Realtime Database
+function syncMenu() {
+    if (!useFirebase || !db) {
+        if (menu.length === 0) {
+            fetchInitialData().then(() => renderUI());
+        }
+        return;
+    }
+
+    const menuRef = db.ref('menu');
+    menuRef.on('value', async (snapshot) => {
+        const val = snapshot.val();
+        let firebaseMenu = [];
+        if (val) {
+            if (Array.isArray(val)) {
+                firebaseMenu = val.filter(item => item !== null && item.name.toLowerCase() !== 'productos' && item.name.toLowerCase() !== 'nan');
+            } else {
+                firebaseMenu = Object.values(val).filter(item => item !== null && item.name.toLowerCase() !== 'productos' && item.name.toLowerCase() !== 'nan');
+            }
+        }
+
+        if (firebaseMenu.length > 0) {
+            menu = firebaseMenu;
+            localStorage.setItem('donjuan_menu', JSON.stringify(menu));
+            renderUI();
+        } else {
+            console.log("No menu found in Firebase database (or it is empty). Initializing with default data from menu.json...");
+            await fetchInitialData();
+            if (menu.length > 0) {
+                menuRef.set(menu).catch(err => {
+                    console.error("Failed to write initial menu to Firebase:", err);
+                });
+            }
+        }
+    }, (error) => {
+        console.error("Error reading menu from Firebase:", error);
+        if (menu.length === 0) {
+            fetchInitialData().then(() => renderUI());
+        }
+    });
+}
+
+// Sync tickets with Firebase Realtime Database
+function syncTickets() {
+    if (!useFirebase || !db) return;
+
+    const ticketsRef = db.ref('tickets');
+    ticketsRef.on('value', (snapshot) => {
+        const val = snapshot.val();
+        if (val) {
+            let list = Object.values(val);
+            list.sort((a, b) => a.number - b.number);
+            tickets = list;
+            localStorage.setItem('donjuan_tickets', JSON.stringify(tickets));
+
+            if (dashboardView && dashboardView.classList.contains('active')) {
+                renderDashboard();
+            }
+        } else {
+            tickets = [];
+            localStorage.setItem('donjuan_tickets', JSON.stringify(tickets));
+            if (dashboardView && dashboardView.classList.contains('active')) {
+                renderDashboard();
+            }
+        }
+    }, (error) => {
+        console.error("Error reading tickets from Firebase:", error);
+    });
+}
+
 // DOM Elements
 const modeToggle = document.getElementById('modeToggle');
 const modeLabel = document.getElementById('modeLabel');
@@ -52,6 +153,13 @@ const closeOptionsModalBtn = document.getElementById('closeOptionsModal');
 const confirmOptionsBtn = document.getElementById('confirmOptionsBtn');
 const optionsList = document.getElementById('optionsList');
 const optionsModalProductName = document.getElementById('optionsModalProductName');
+const paymentModal = document.getElementById('paymentModal');
+const closePaymentModalBtn = document.getElementById('closePaymentModal');
+
+const howToUseModal = document.getElementById('howToUseModal');
+const closeHowToUseModalBtn = document.getElementById('closeHowToUseModal');
+const closeHowToUseModalBtnOk = document.getElementById('closeHowToUseModalBtn');
+const howToUseBtn = document.getElementById('howToUseBtn');
 
 let currentProductForOptions = null;
 
@@ -60,6 +168,8 @@ const loginModal = document.getElementById('loginModal');
 const closeLoginModalBtn = document.getElementById('closeLoginModal');
 const openLoginBtn = document.getElementById('openLoginBtn');
 const adminControls = document.getElementById('adminControls');
+const adminMenuToggleBtn = document.getElementById('adminMenuToggleBtn');
+const adminDropdownMenu = document.getElementById('adminDropdownMenu');
 const logoutBtn = document.getElementById('logoutBtn');
 const appContainer = document.getElementById('appContainer');
 const loginForm = document.getElementById('loginForm');
@@ -70,9 +180,8 @@ const loginError = document.getElementById('loginError');
 // Initialize Application
 async function initApp() {
     loadState();
-    if (menu.length === 0) {
-        await fetchInitialData();
-    }
+    syncMenu();
+    syncTickets();
     renderUI();
     setupEventListeners();
 }
@@ -94,13 +203,20 @@ function saveState() {
     localStorage.setItem('donjuan_tickets', JSON.stringify(tickets));
 }
 
+function capitalizeFirstLetter(string) {
+    if (!string) return '';
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
 async function fetchInitialData() {
     try {
         const response = await fetch('menu.json');
         if (response.ok) {
             const data = await response.json();
             // Filter out the header row if present (id 1 "productos")
-            menu = data.filter(item => item.name.toLowerCase() !== 'productos' && item.name.toLowerCase() !== 'nan');
+            menu = data
+                .filter(item => item.name.toLowerCase() !== 'productos' && item.name.toLowerCase() !== 'nan')
+                .map(item => ({ ...item, name: capitalizeFirstLetter(item.name) }));
             saveState();
         }
     } catch (e) {
@@ -112,7 +228,7 @@ function setupEventListeners() {
     // Mode Toggle
     modeToggle.addEventListener('change', (e) => {
         const isTryingToClose = e.target.checked;
-        
+
         if (isTryingToClose) {
             const pwd = prompt('Ingrese la contraseña de administrador para cerrar turno:');
             if (pwd !== '12345') {
@@ -123,16 +239,19 @@ function setupEventListeners() {
 
             // Pedir confirmación al cerrar turno
             const confirmClose = confirm('¿Estás seguro de que deseas cerrar el turno? Esto borrará todos los tickets actuales y el contador iniciará en 1 para el próximo turno.');
-            
+
             if (!confirmClose) {
                 // Revertir el toggle si cancela
                 e.target.checked = false;
                 return;
             }
-            
+
             // Si confirma, borrar todos los tickets
             tickets = [];
             saveState();
+            if (useFirebase && db) {
+                db.ref('tickets').set(null).catch(err => console.error("Error clearing tickets in Firebase:", err));
+            }
         }
 
         isCerrado = e.target.checked;
@@ -140,12 +259,12 @@ function setupEventListeners() {
 
         if (isCerrado) {
             abiertoView.classList.remove('active');
-            if(dashboardView) dashboardView.classList.remove('active');
+            if (dashboardView) dashboardView.classList.remove('active');
             cerradoView.classList.add('active');
             renderAdminMenu();
         } else {
             cerradoView.classList.remove('active');
-            if(dashboardView) dashboardView.classList.remove('active');
+            if (dashboardView) dashboardView.classList.remove('active');
             abiertoView.classList.add('active');
             renderClientMenu();
             clearCart();
@@ -195,6 +314,27 @@ function setupEventListeners() {
     closeProductModalBtn.addEventListener('click', () => productModal.classList.remove('show'));
     closeTicketModalBtn.addEventListener('click', () => ticketModal.classList.remove('show'));
     closeTicketsListModalBtn.addEventListener('click', () => ticketsListModal.classList.remove('show'));
+    closePaymentModalBtn.addEventListener('click', () => paymentModal.classList.remove('show'));
+
+    // Payment option buttons click
+    const paymentButtons = paymentModal.querySelectorAll('.payment-option-btn');
+    paymentButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const method = btn.dataset.method;
+            executeReservation(method);
+        });
+    });
+
+    // How to use Modal Events
+    if (howToUseBtn && howToUseModal) {
+        howToUseBtn.addEventListener('click', () => howToUseModal.classList.add('show'));
+    }
+    if (closeHowToUseModalBtn) {
+        closeHowToUseModalBtn.addEventListener('click', () => howToUseModal.classList.remove('show'));
+    }
+    if (closeHowToUseModalBtnOk) {
+        closeHowToUseModalBtnOk.addEventListener('click', () => howToUseModal.classList.remove('show'));
+    }
 
     // Cart Events
     customerNameInput.addEventListener('input', updateReserveButton);
@@ -219,12 +359,35 @@ function setupEventListeners() {
         });
     }
 
+    // Admin Dropdown Toggle
+    if (adminMenuToggleBtn && adminDropdownMenu) {
+        adminMenuToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            adminDropdownMenu.classList.toggle('show');
+        });
+
+        // Close dropdown when clicking outside
+        window.addEventListener('click', (e) => {
+            if (adminDropdownMenu.classList.contains('show') && !adminControls.contains(e.target)) {
+                adminDropdownMenu.classList.remove('show');
+            }
+        });
+
+        // Close dropdown when any item inside is clicked
+        const dropdownItems = adminDropdownMenu.querySelectorAll('button');
+        dropdownItems.forEach(btn => {
+            btn.addEventListener('click', () => {
+                adminDropdownMenu.classList.remove('show');
+            });
+        });
+    }
+
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const user = loginUser.value.trim();
             const pass = loginPassword.value.trim();
-            
+
             if (user.toLowerCase() === 'admin' && pass === '12345') {
                 loginError.style.display = 'none';
                 loginSuccess('admin');
@@ -247,7 +410,7 @@ function setupEventListeners() {
     });
     confirmOptionsBtn.addEventListener('click', () => {
         if (!currentProductForOptions) return;
-        
+
         const selects = optionsList.querySelectorAll('.option-select');
         const options = [];
         selects.forEach(sel => {
@@ -256,7 +419,7 @@ function setupEventListeners() {
                 options.push({ name: sel.dataset.ingredient, value: val });
             }
         });
-        
+
         addToCartWithOptions(currentProductForOptions, options);
         optionsModal.classList.remove('show');
         currentProductForOptions = null;
@@ -280,8 +443,9 @@ function loginSuccess(role) {
 
 function logout() {
     if (adminControls) adminControls.style.display = 'none';
+    if (adminDropdownMenu) adminDropdownMenu.classList.remove('show');
     if (openLoginBtn) openLoginBtn.style.display = 'block';
-    
+
     // Default to client view
     isCerrado = false;
     if (modeToggle) modeToggle.checked = false;
@@ -290,7 +454,7 @@ function logout() {
     if (abiertoView) abiertoView.classList.add('active');
     renderClientMenu();
     clearCart();
-    
+
     if (loginForm) loginForm.reset();
 }
 
@@ -358,7 +522,7 @@ function generateCartKey(productId, options) {
 function addToCart(productId) {
     const product = menu.find(p => p.id === productId);
     if (!product) return;
-    
+
     if (isPreparedFood(product.name)) {
         currentProductForOptions = product;
         openOptionsModal(product);
@@ -368,10 +532,10 @@ function addToCart(productId) {
 }
 
 function openOptionsModal(product) {
-    optionsModalProductName.textContent = product.name;
+    optionsModalProductName.textContent = capitalizeFirstLetter(product.name);
     const ingredients = ['Jitomate', 'Queso Oaxaca', 'Lechuga', 'Crema', 'Salsa'];
     optionsList.innerHTML = '';
-    
+
     ingredients.forEach(ing => {
         const item = document.createElement('div');
         item.className = 'option-item';
@@ -385,7 +549,7 @@ function openOptionsModal(product) {
         `;
         optionsList.appendChild(item);
     });
-    
+
     optionsModal.classList.add('show');
 }
 
@@ -468,6 +632,14 @@ function processReservation() {
     const customerName = customerNameInput.value.trim();
     if (!customerName || Object.keys(cart).length === 0) return;
 
+    // Open payment modal
+    paymentModal.classList.add('show');
+}
+
+function executeReservation(paymentMethod) {
+    const customerName = customerNameInput.value.trim();
+    if (!customerName || Object.keys(cart).length === 0) return;
+
     // Generate Ticket Number
     const ticketNumber = tickets.length > 0 ? tickets[tickets.length - 1].number + 1 : 1;
 
@@ -475,14 +647,14 @@ function processReservation() {
     let total = 0;
     const itemsList = Object.values(cart).map(item => {
         total += item.price * item.qty;
-        
+
         let optsText = '';
         if (item.options && item.options.length > 0) {
             optsText = ' (' + item.options.map(o => `${o.value} ${o.name}`).join(', ') + ')';
         }
 
         return {
-            name: item.name + optsText,
+            name: capitalizeFirstLetter(item.name) + optsText,
             qty: item.qty,
             price: item.price,
             total: item.price * item.qty
@@ -495,14 +667,24 @@ function processReservation() {
         items: itemsList,
         total: total,
         date: new Date().toISOString(),
-        status: 'esperando'
+        status: 'esperando',
+        paymentMethod: paymentMethod
     };
 
-    tickets.push(newTicket);
-    saveState();
+    if (useFirebase && db) {
+        db.ref('tickets/ticket_' + newTicket.number).set(newTicket).catch(err => {
+            console.error("Error saving ticket to Firebase:", err);
+            tickets.push(newTicket);
+            saveState();
+        });
+    } else {
+        tickets.push(newTicket);
+        saveState();
+    }
 
     showTicketModal(newTicket);
     clearCart();
+    paymentModal.classList.remove('show');
     if (cartSidebar) cartSidebar.classList.remove('show-mobile');
 }
 
@@ -510,6 +692,11 @@ function showTicketModal(ticket) {
     document.getElementById('ticketNumberDisplay').textContent = ticket.number;
     document.getElementById('ticketCustomerName').textContent = ticket.customer;
     document.getElementById('ticketTotalDisplay').textContent = `$${ticket.total.toFixed(2)}`;
+
+    const ticketPaymentMethodDisplay = document.getElementById('ticketPaymentMethodDisplay');
+    if (ticketPaymentMethodDisplay) {
+        ticketPaymentMethodDisplay.textContent = ticket.paymentMethod || 'Efectivo';
+    }
 
     let statusText = 'Esperando Confirmación';
     let statusColor = '#d94f04';
@@ -539,7 +726,7 @@ function showTicketModal(ticket) {
         const row = document.createElement('div');
         row.className = 'ticket-item-row';
         row.innerHTML = `
-            <span>${item.qty}x ${item.name}</span>
+            <span>${item.qty}x ${capitalizeFirstLetter(item.name)}</span>
             <span>$${item.total.toFixed(2)}</span>
         `;
         itemsContainer.appendChild(row);
@@ -551,6 +738,7 @@ function showTicketModal(ticket) {
         n: ticket.number,
         c: ticket.customer,
         t: ticket.total,
+        p: ticket.paymentMethod || 'Efectivo',
         i: ticket.items.map(i => [i.qty, i.name, i.total])
     };
     // Codificación segura en base64 para caracteres especiales (tildes, eñes)
@@ -589,22 +777,26 @@ function openProductModal(productId = null) {
 
 function saveProduct() {
     const idValue = document.getElementById('productId').value;
-    const name = document.getElementById('productName').value.trim();
+    const name = capitalizeFirstLetter(document.getElementById('productName').value.trim());
     const price = parseFloat(document.getElementById('productPrice').value);
     const image = document.getElementById('productImage').value.trim();
 
+    let updatedMenu = [...menu];
     if (editingProductId !== null) {
         // Edit
-        const idx = menu.findIndex(p => p.id === editingProductId);
+        const idx = updatedMenu.findIndex(p => p.id === editingProductId);
         if (idx > -1) {
-            menu[idx].name = name;
-            menu[idx].price = price;
-            menu[idx].image = image;
+            updatedMenu[idx] = {
+                ...updatedMenu[idx],
+                name: name,
+                price: price,
+                image: image
+            };
         }
     } else {
         // Add
-        const newId = menu.length > 0 ? Math.max(...menu.map(p => p.id)) + 1 : 1;
-        menu.push({
+        const newId = updatedMenu.length > 0 ? Math.max(...updatedMenu.map(p => p.id)) + 1 : 1;
+        updatedMenu.push({
             id: newId,
             name: name,
             price: price,
@@ -612,16 +804,39 @@ function saveProduct() {
         });
     }
 
-    saveState();
-    renderAdminMenu();
-    productModal.classList.remove('show');
+    if (useFirebase && db) {
+        db.ref('menu').set(updatedMenu).then(() => {
+            productModal.classList.remove('show');
+        }).catch(err => {
+            console.error("Error saving product to Firebase:", err);
+            menu = updatedMenu;
+            saveState();
+            renderAdminMenu();
+            productModal.classList.remove('show');
+        });
+    } else {
+        menu = updatedMenu;
+        saveState();
+        renderAdminMenu();
+        productModal.classList.remove('show');
+    }
 }
 
 function deleteProduct(productId) {
     if (confirm('¿Estás seguro de que deseas eliminar este producto?')) {
-        menu = menu.filter(p => p.id !== productId);
-        saveState();
-        renderAdminMenu();
+        const updatedMenu = menu.filter(p => p.id !== productId);
+        if (useFirebase && db) {
+            db.ref('menu').set(updatedMenu).catch(err => {
+                console.error("Error deleting product in Firebase:", err);
+                menu = updatedMenu;
+                saveState();
+                renderAdminMenu();
+            });
+        } else {
+            menu = updatedMenu;
+            saveState();
+            renderAdminMenu();
+        }
     }
 }
 
@@ -640,7 +855,7 @@ function openTicketsHistory() {
             const itemEl = document.createElement('div');
             itemEl.className = 'history-item';
 
-            let itemsHtml = ticket.items.map(i => `${i.qty}x ${i.name}`).join(', ');
+            let itemsHtml = ticket.items.map(i => `${i.qty}x ${capitalizeFirstLetter(i.name)}`).join(', ');
 
             let statusText = 'Esperando Confirmación';
             let statusColor = '#d94f04';
@@ -665,6 +880,7 @@ function openTicketsHistory() {
                 </div>
                 <div style="font-size:0.9rem; color:var(--text-light); margin-bottom:0.5rem;">${dateStr}</div>
                 <div style="font-size:0.9rem; margin-bottom:0.5rem;"><strong>Estado:</strong> <span style="color:${statusColor}; font-weight:bold;">${statusText}</span></div>
+                <div style="font-size:0.9rem; margin-bottom:0.5rem;"><strong>Pago:</strong> <span style="font-weight:bold; color:var(--accent-color);">${ticket.paymentMethod || 'Efectivo'}</span></div>
                 <div style="font-size:0.9rem;"><strong>Pedido:</strong> ${itemsHtml}</div>
                 <button class="btn-secondary mt-4" style="padding:0.3rem 0.8rem; font-size:0.8rem;" onclick='reprintTicket(${JSON.stringify(ticket)})'>Reimprimir</button>
             `;
@@ -681,19 +897,32 @@ window.reprintTicket = function (ticket) {
 };
 
 // Dashboard Logic
-window.updateTicketStatus = function(number, status) {
-    const idx = tickets.findIndex(t => t.number === number);
-    if (idx > -1) {
-        tickets[idx].status = status;
-        saveState();
-        renderDashboard();
-        if (document.getElementById('ticketsListModal').classList.contains('show')) openTicketsHistory();
+window.updateTicketStatus = function (number, status) {
+    if (useFirebase && db) {
+        db.ref('tickets/ticket_' + number).update({ status: status }).catch(err => {
+            console.error("Error updating ticket status in Firebase:", err);
+            const idx = tickets.findIndex(t => t.number === number);
+            if (idx > -1) {
+                tickets[idx].status = status;
+                saveState();
+                renderDashboard();
+                if (document.getElementById('ticketsListModal').classList.contains('show')) openTicketsHistory();
+            }
+        });
+    } else {
+        const idx = tickets.findIndex(t => t.number === number);
+        if (idx > -1) {
+            tickets[idx].status = status;
+            saveState();
+            renderDashboard();
+            if (document.getElementById('ticketsListModal').classList.contains('show')) openTicketsHistory();
+        }
     }
 }
 
 function renderDashboard() {
     if (!colEsperando || !colPreparacion || !colListos || !colEntregados) return;
-    
+
     colEsperando.innerHTML = '';
     colPreparacion.innerHTML = '';
     colListos.innerHTML = '';
@@ -720,7 +949,7 @@ function renderDashboard() {
 function createDashboardCard(ticket) {
     const card = document.createElement('div');
     card.style.cssText = 'background: white; border-radius: var(--radius-md); padding: 1rem; box-shadow: var(--shadow-sm);';
-    
+
     if (ticket.status === 'esperando' || !ticket.status) card.style.borderLeft = '5px solid #d94f04';
     else if (ticket.status === 'preparacion' || ticket.status === 'pendiente') card.style.borderLeft = '5px solid orange';
     else if (ticket.status === 'listo') card.style.borderLeft = '5px solid var(--accent-color)';
@@ -729,7 +958,7 @@ function createDashboardCard(ticket) {
     const d = new Date(ticket.date);
     const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    let itemsHtml = ticket.items.map(i => `<div style="margin-bottom:4px;"><strong>${i.qty}x</strong> ${i.name}</div>`).join('');
+    let itemsHtml = ticket.items.map(i => `<div style="margin-bottom:4px;"><strong>${i.qty}x</strong> ${capitalizeFirstLetter(i.name)}</div>`).join('');
 
     let actionBtns = '';
     if (ticket.status === 'esperando' || !ticket.status) {
@@ -753,6 +982,9 @@ function createDashboardCard(ticket) {
         <div style="font-size:0.95rem; margin-bottom:0.8rem; color: var(--text-color);">
             ${itemsHtml}
         </div>
+        <div style="font-size:0.9rem; margin-bottom:0.8rem; color: var(--text-light);">
+            <strong>Pago:</strong> <span style="font-weight:bold; color:var(--accent-color);">${ticket.paymentMethod || 'Efectivo'}</span>
+        </div>
         <div style="font-size:0.85rem; color:var(--text-light); text-align:right;">
             <span style="font-weight:bold; color:var(--primary-color); font-size:1.1rem;">$${ticket.total.toFixed(2)}</span>
         </div>
@@ -775,6 +1007,9 @@ function getIconForFood(name) {
 }
 
 // Start
+// Initialize Firebase first so it's available for either branch
+initFirebase();
+
 const urlParams = new URLSearchParams(window.location.search);
 const resumenData = urlParams.get('resumen');
 
@@ -795,27 +1030,19 @@ if (resumenData) {
         document.getElementById('resumenCustomer').textContent = ticketData.c;
         document.getElementById('resumenTotal').textContent = `$${ticketData.t.toFixed(2)}`;
 
-        function updateResumenStatus() {
-            let currentStatus = 'esperando';
-            const savedTickets = localStorage.getItem('donjuan_tickets');
-            if (savedTickets) {
-                const localTickets = JSON.parse(savedTickets);
-                const found = localTickets.find(t => t.number === ticketData.n);
-                if (found && found.status) currentStatus = found.status;
-            }
-
+        function setStatusDisplay(status) {
             let statusText = 'Esperando Confirmación';
             let statusColor = '#d94f04';
-            if (currentStatus === 'preparacion' || currentStatus === 'pendiente') {
+            if (status === 'preparacion' || status === 'pendiente') {
                 statusText = 'En Preparación';
                 statusColor = 'orange';
-            } else if (currentStatus === 'listo') {
+            } else if (status === 'listo') {
                 statusText = 'Listo para Entregar';
                 statusColor = 'var(--accent-color)';
-            } else if (currentStatus === 'entregado') {
+            } else if (status === 'entregado') {
                 statusText = 'Entregado';
                 statusColor = 'var(--success-color)';
-            } else if (currentStatus === 'rechazado') {
+            } else if (status === 'rechazado') {
                 statusText = 'Rechazado';
                 statusColor = 'var(--danger-color)';
             }
@@ -826,9 +1053,38 @@ if (resumenData) {
                 resumenStatus.style.color = statusColor;
             }
         }
-        
-        updateResumenStatus();
-        setInterval(updateResumenStatus, 3000);
+
+        // Set initial status to 'esperando'
+        setStatusDisplay('esperando');
+
+        // Sync with Firebase in real time
+        if (useFirebase && db) {
+            db.ref('tickets/ticket_' + ticketData.n).on('value', (snapshot) => {
+                const ticketVal = snapshot.val();
+                if (ticketVal && ticketVal.status) {
+                    setStatusDisplay(ticketVal.status);
+                }
+            });
+        } else {
+            // Local fallback polling
+            function updateResumenStatusLocal() {
+                const savedTickets = localStorage.getItem('donjuan_tickets');
+                if (savedTickets) {
+                    const localTickets = JSON.parse(savedTickets);
+                    const found = localTickets.find(t => t.number === ticketData.n);
+                    if (found && found.status) {
+                        setStatusDisplay(found.status);
+                    }
+                }
+            }
+            updateResumenStatusLocal();
+            setInterval(updateResumenStatusLocal, 3000);
+        }
+
+        const resumenPaymentMethod = document.getElementById('resumenPaymentMethod');
+        if (resumenPaymentMethod) {
+            resumenPaymentMethod.textContent = ticketData.p || 'Efectivo';
+        }
 
         const itemsContainer = document.getElementById('resumenItems');
         ticketData.i.forEach(item => {
@@ -836,7 +1092,7 @@ if (resumenData) {
             row.className = 'ticket-item-row';
             row.style.marginBottom = '10px';
             row.innerHTML = `
-                <span>${item[0]}x ${item[1]}</span>
+                <span>${item[0]}x ${capitalizeFirstLetter(item[1])}</span>
                 <span style="font-weight: 800;">$${item[2].toFixed(2)}</span>
             `;
             itemsContainer.appendChild(row);
