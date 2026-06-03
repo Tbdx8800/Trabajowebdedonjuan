@@ -4,7 +4,6 @@ let tickets = [];
 let cart = {};
 let isCerrado = false;
 let editingProductId = null;
-let currentActiveTicket = null;
 
 // Firebase Integration Config & State
 const firebaseConfig = {
@@ -137,7 +136,6 @@ const closeProductModalBtn = document.getElementById('closeProductModal');
 const ticketModal = document.getElementById('ticketModal');
 const closeTicketModalBtn = document.getElementById('closeTicketModal');
 const printTicketBtn = document.getElementById('printTicketBtn');
-const whatsappTicketBtn = document.getElementById('whatsappTicketBtn');
 
 const ticketsListModal = document.getElementById('ticketsListModal');
 const viewTicketsBtn = document.getElementById('viewTicketsBtn');
@@ -434,13 +432,6 @@ function setupEventListeners() {
     printTicketBtn.addEventListener('click', () => {
         window.print();
     });
-
-    // WhatsApp Ticket
-    if (whatsappTicketBtn) {
-        whatsappTicketBtn.addEventListener('click', () => {
-            sendTicketToWhatsapp();
-        });
-    }
 }
 
 // Auth Logic
@@ -698,7 +689,6 @@ function executeReservation(paymentMethod) {
 }
 
 function showTicketModal(ticket) {
-    currentActiveTicket = ticket;
     document.getElementById('ticketNumberDisplay').textContent = ticket.number;
     document.getElementById('ticketCustomerName').textContent = ticket.customer;
     document.getElementById('ticketTotalDisplay').textContent = `$${ticket.total.toFixed(2)}`;
@@ -759,35 +749,6 @@ function showTicketModal(ticket) {
     document.getElementById('ticketQrCode').src = qrUrl;
 
     ticketModal.classList.add('show');
-}
-
-// WhatsApp Ticket Sharing
-function sendTicketToWhatsapp() {
-    if (!currentActiveTicket) {
-        alert("No hay un ticket activo para enviar.");
-        return;
-    }
-
-    const ticket = currentActiveTicket;
-    
-    // Construct the WhatsApp message text (using only standard ASCII characters to avoid encoding issues)
-    const number = "524591213824";
-    const itemsText = ticket.items.map(item => `- ${item.qty}x ${item.name} ($${item.total.toFixed(2)})`).join('\n');
-    const messageText = `Hola! Aqui tienes los detalles de mi pedido.
-
-Ticket #: ${ticket.number}
-Cliente: ${ticket.customer}
-Metodo de Pago: ${ticket.paymentMethod || 'Efectivo'}
-Total: $${ticket.total.toFixed(2)}
-
-Detalles:
-${itemsText}`;
-
-    const encodedText = encodeURIComponent(messageText);
-    const whatsappUrl = `https://wa.me/${number}?text=${encodedText}`;
-
-    // Redirect to WhatsApp directly
-    window.open(whatsappUrl, '_blank');
 }
 
 // Admin Logic
