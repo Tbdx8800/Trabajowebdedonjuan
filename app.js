@@ -4,6 +4,7 @@ let tickets = [];
 let cart = {};
 let isCerrado = false;
 let editingProductId = null;
+let currentActiveTicket = null;
 
 // Firebase Integration Config & State
 const firebaseConfig = {
@@ -136,6 +137,7 @@ const closeProductModalBtn = document.getElementById('closeProductModal');
 const ticketModal = document.getElementById('ticketModal');
 const closeTicketModalBtn = document.getElementById('closeTicketModal');
 const printTicketBtn = document.getElementById('printTicketBtn');
+const whatsappTicketBtn = document.getElementById('whatsappTicketBtn');
 
 const ticketsListModal = document.getElementById('ticketsListModal');
 const viewTicketsBtn = document.getElementById('viewTicketsBtn');
@@ -184,6 +186,7 @@ async function initApp() {
     syncTickets();
     renderUI();
     setupEventListeners();
+    loadSheetsConfig();
 }
 
 function loadState() {
@@ -432,6 +435,78 @@ function setupEventListeners() {
     printTicketBtn.addEventListener('click', () => {
         window.print();
     });
+
+    // WhatsApp Ticket
+    if (whatsappTicketBtn) {
+        whatsappTicketBtn.addEventListener('click', () => {
+            sendTicketToWhatsapp();
+        });
+    }
+
+    // Sales and Excel Modal Toggle
+    const viewSalesExcelBtn = document.getElementById('viewSalesExcelBtn');
+    if (viewSalesExcelBtn) {
+        viewSalesExcelBtn.addEventListener('click', () => {
+            openSalesExcelModal();
+        });
+    }
+
+    const closeSalesExcelModal = document.getElementById('closeSalesExcelModal');
+    if (closeSalesExcelModal) {
+        closeSalesExcelModal.addEventListener('click', () => {
+            document.getElementById('salesExcelModal').classList.remove('show');
+        });
+    }
+
+    // Setup tabs for Sales Modal
+    setupSalesTabs();
+
+    // Export Excel Click
+    const exportExcelBtn = document.getElementById('exportExcelBtn');
+    if (exportExcelBtn) {
+        exportExcelBtn.addEventListener('click', exportShiftToExcel);
+    }
+
+    // Import Excel Input Change
+    const importExcelInput = document.getElementById('importExcelInput');
+    if (importExcelInput) {
+        importExcelInput.addEventListener('change', handleExcelImport);
+    }
+
+    // Google Sheets Config Save
+    const saveSheetConfigBtn = document.getElementById('saveSheetConfigBtn');
+    if (saveSheetConfigBtn) {
+        saveSheetConfigBtn.addEventListener('click', saveGoogleSheetId);
+    }
+
+    const saveScriptUrlBtn = document.getElementById('saveScriptUrlBtn');
+    if (saveScriptUrlBtn) {
+        saveScriptUrlBtn.addEventListener('click', saveGoogleAppScriptUrl);
+    }
+
+    const fetchCsvBtn = document.getElementById('fetchCsvBtn');
+    if (fetchCsvBtn) {
+        fetchCsvBtn.addEventListener('click', fetchGoogleSheetCsv);
+    }
+
+    // Toggle embed / CSV preview view
+    const toggleEmbedBtn = document.getElementById('toggleEmbedBtn');
+    if (toggleEmbedBtn) {
+        toggleEmbedBtn.addEventListener('click', () => {
+            const iframeContainer = document.getElementById('sheetsIframeContainer');
+            const csvContainer = document.getElementById('csvTableContainer');
+            if (iframeContainer.style.display === 'none') {
+                iframeContainer.style.display = 'block';
+                toggleEmbedBtn.textContent = 'Ver Tabla (CSV)';
+            } else {
+                iframeContainer.style.display = 'none';
+                if (csvContainer.innerHTML !== '') {
+                    csvContainer.style.display = 'block';
+                }
+                toggleEmbedBtn.textContent = 'Ver Hoja en Vivo (Iframe)';
+            }
+        });
+    }
 }
 
 // Auth Logic
@@ -584,12 +659,19 @@ function renderCart() {
     } else {
         itemKeys.forEach(key => {
             const item = cart[key];
-            const itemTotal = item.price * item.qty;
+            const extrasCount = (item.options || []).filter(o => o.value === 'Extra').length;
+            const priceWithExtras = item.price + (extrasCount * 5);
+            const itemTotal = priceWithExtras * item.qty;
             total += itemTotal;
 
             let optionsHtml = '';
             if (item.options && item.options.length > 0) {
-                const optsText = item.options.map(o => `${o.value} ${o.name}`).join(', ');
+                const optsText = item.options.map(o => {
+                    if (o.value === 'Extra') {
+                        return `${o.value} ${o.name} (+$5)`;
+                    }
+                    return `${o.value} ${o.name}`;
+                }).join(', ');
                 optionsHtml = `<div style="font-size: 0.8rem; color: var(--text-light); margin-bottom: 0.3rem;">${optsText}</div>`;
             }
 
@@ -646,18 +728,25 @@ function executeReservation(paymentMethod) {
     // Calculate total
     let total = 0;
     const itemsList = Object.values(cart).map(item => {
-        total += item.price * item.qty;
+        const extrasCount = (item.options || []).filter(o => o.value === 'Extra').length;
+        const priceWithExtras = item.price + (extrasCount * 5);
+        total += priceWithExtras * item.qty;
 
         let optsText = '';
         if (item.options && item.options.length > 0) {
-            optsText = ' (' + item.options.map(o => `${o.value} ${o.name}`).join(', ') + ')';
+            optsText = ' (' + item.options.map(o => {
+                if (o.value === 'Extra') {
+                    return `${o.value} ${o.name} (+$5)`;
+                }
+                return `${o.value} ${o.name}`;
+            }).join(', ') + ')';
         }
 
         return {
             name: capitalizeFirstLetter(item.name) + optsText,
             qty: item.qty,
-            price: item.price,
-            total: item.price * item.qty
+            price: priceWithExtras,
+            total: priceWithExtras * item.qty
         };
     });
 
@@ -682,6 +771,34 @@ function executeReservation(paymentMethod) {
         saveState();
     }
 
+    // Sincronizar con Google Sheets en tiempo real si está configurado
+    const googleScriptUrl = localStorage.getItem('donjuan_google_script_url');
+    if (googleScriptUrl) {
+        const itemsSummary = newTicket.items.map(item => `${item.qty}x ${item.name}`).join(', ');
+        const payload = {
+            number: newTicket.number,
+            customer: newTicket.customer,
+            date: new Date(newTicket.date).toLocaleString(),
+            paymentMethod: newTicket.paymentMethod || 'Efectivo',
+            total: newTicket.total,
+            items: itemsSummary,
+            status: newTicket.status
+        };
+
+        fetch(googleScriptUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        }).then(() => {
+            console.log("Ticket sincronizado con Google Sheets.");
+        }).catch(err => {
+            console.error("Error al sincronizar ticket con Google Sheets:", err);
+        });
+    }
+
     showTicketModal(newTicket);
     clearCart();
     paymentModal.classList.remove('show');
@@ -689,6 +806,7 @@ function executeReservation(paymentMethod) {
 }
 
 function showTicketModal(ticket) {
+    currentActiveTicket = ticket;
     document.getElementById('ticketNumberDisplay').textContent = ticket.number;
     document.getElementById('ticketCustomerName').textContent = ticket.customer;
     document.getElementById('ticketTotalDisplay').textContent = `$${ticket.total.toFixed(2)}`;
@@ -696,6 +814,17 @@ function showTicketModal(ticket) {
     const ticketPaymentMethodDisplay = document.getElementById('ticketPaymentMethodDisplay');
     if (ticketPaymentMethodDisplay) {
         ticketPaymentMethodDisplay.textContent = ticket.paymentMethod || 'Efectivo';
+    }
+
+    const transferDetails = document.getElementById('transferDetailsDisplay');
+    if (transferDetails) {
+        if (ticket.paymentMethod === 'Transferencia') {
+            transferDetails.style.display = 'block';
+            const conceptNumEl = transferDetails.querySelector('.transfer-concept-num');
+            if (conceptNumEl) conceptNumEl.textContent = ticket.number;
+        } else {
+            transferDetails.style.display = 'none';
+        }
     }
 
     let statusText = 'Esperando Confirmación';
@@ -749,6 +878,38 @@ function showTicketModal(ticket) {
     document.getElementById('ticketQrCode').src = qrUrl;
 
     ticketModal.classList.add('show');
+}
+
+// WhatsApp Ticket Sharing
+function sendTicketToWhatsapp() {
+    if (!currentActiveTicket) {
+        alert("No hay un ticket activo para enviar.");
+        return;
+    }
+
+    const ticket = currentActiveTicket;
+    
+    // Construct the WhatsApp message text (using only standard ASCII characters to avoid encoding issues)
+    const number = "524591213824";
+    const itemsText = ticket.items.map(item => `- ${item.qty}x ${item.name} ($${item.total.toFixed(2)})`).join('\n');
+    let messageText = `Hola! Aqui tienes los detalles de mi pedido.
+
+Ticket #: ${ticket.number}
+Cliente: ${ticket.customer}
+Metodo de Pago: ${ticket.paymentMethod || 'Efectivo'}
+Total: $${ticket.total.toFixed(2)}`;
+
+    if (ticket.paymentMethod === 'Transferencia') {
+        messageText += `\nNUMERO DE CUENTA: 01234567891234\nNOMBRE DEL BENEFICIARIO: DON JUAN\nCONCEPTO: PEDIDO #${ticket.number}`;
+    }
+
+    messageText += `\n\nDetalles:\n${itemsText}`;
+
+    const encodedText = encodeURIComponent(messageText);
+    const whatsappUrl = `https://wa.me/${number}?text=${encodedText}`;
+
+    // Redirect to WhatsApp directly
+    window.open(whatsappUrl, '_blank');
 }
 
 // Admin Logic
@@ -1006,6 +1167,470 @@ function getIconForFood(name) {
     return '🍽️';
 }
 
+// ==========================================
+// INTEGRACIÓN DE HOJAS DE CÁLCULO Y VENTAS
+// ==========================================
+
+function openSalesExcelModal() {
+    // Calcular estadísticas
+    let totalRevenue = 0;
+    let cashTotal = 0;
+    let cardTotal = 0;
+    let transferTotal = 0;
+    let orderCount = 0;
+    let deliveredCount = 0;
+
+    const productBreakdown = {};
+
+    tickets.forEach(ticket => {
+        if (ticket.status === 'rechazado') return;
+        orderCount++;
+        totalRevenue += ticket.total;
+        
+        if (ticket.status === 'entregado') deliveredCount++;
+
+        const method = (ticket.paymentMethod || 'Efectivo').toLowerCase();
+        if (method.includes('efectivo')) {
+            cashTotal += ticket.total;
+        } else if (method.includes('tarjeta') || method.includes('terminal')) {
+            cardTotal += ticket.total;
+        } else {
+            transferTotal += ticket.total;
+        }
+
+        ticket.items.forEach(item => {
+            if (!productBreakdown[item.name]) {
+                productBreakdown[item.name] = { qty: 0, total: 0 };
+            }
+            productBreakdown[item.name].qty += item.qty;
+            productBreakdown[item.name].total += item.total;
+        });
+    });
+
+    // Rellenar métricas en el modal
+    document.getElementById('salesTotalRevenue').textContent = `$${totalRevenue.toFixed(2)}`;
+    document.getElementById('salesTotalCompletedOrders').textContent = deliveredCount;
+    document.getElementById('salesAverageOrderVal').textContent = orderCount > 0 ? `$${(totalRevenue / orderCount).toFixed(2)}` : '$0.00';
+    
+    document.getElementById('paymentCashTotal').textContent = `$${cashTotal.toFixed(2)}`;
+    document.getElementById('paymentCardTotal').textContent = `$${cardTotal.toFixed(2)}`;
+    document.getElementById('paymentTransferTotal').textContent = `$${transferTotal.toFixed(2)}`;
+
+    // Rellenar desglose de productos
+    const breakdownTableBody = document.getElementById('salesProductBreakdownTable');
+    breakdownTableBody.innerHTML = '';
+
+    // Convertir a array para ordenar
+    const sortedProducts = Object.keys(productBreakdown).map(name => ({
+        name: name,
+        qty: productBreakdown[name].qty,
+        total: productBreakdown[name].total
+    })).sort((a, b) => b.qty - a.qty);
+
+    if (sortedProducts.length === 0) {
+        breakdownTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-light); font-style: italic;">No hay ventas registradas en este turno</td></tr>';
+    } else {
+        sortedProducts.forEach(prod => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding: 0.6rem 0.8rem; text-transform: capitalize;">${prod.name}</td>
+                <td style="padding: 0.6rem 0.8rem; text-align: center; font-weight: bold;">${prod.qty}</td>
+                <td style="padding: 0.6rem 0.8rem; text-align: right; color: var(--primary-color); font-weight: bold;">$${prod.total.toFixed(2)}</td>
+            `;
+            breakdownTableBody.appendChild(tr);
+        });
+    }
+
+    // Reiniciar pestañas al abrir
+    document.getElementById('btn-tab-summary').click();
+
+    // Mostrar modal
+    document.getElementById('salesExcelModal').classList.add('show');
+}
+
+function exportShiftToExcel() {
+    if (tickets.length === 0) {
+        alert("No hay tickets en este turno para exportar.");
+        return;
+    }
+
+    // Función auxiliar para ajustar automáticamente el ancho de las columnas
+    function autoFitColumns(ws, data) {
+        if (!data || data.length === 0) return;
+        const colWidths = [];
+        let maxCols = 0;
+        data.forEach(row => {
+            if (row && row.length > maxCols) maxCols = row.length;
+        });
+
+        for (let colIdx = 0; colIdx < maxCols; colIdx++) {
+            let maxLen = 12; // Ancho mínimo por defecto
+            data.forEach(row => {
+                // Evitar que el título del reporte (que ocupa una sola celda) deforme el ancho de la primera columna
+                if (row.length === 1 && colIdx === 0) return;
+                
+                const val = row[colIdx];
+                if (val !== undefined && val !== null) {
+                    const valStr = String(val);
+                    if (valStr.length > maxLen) maxLen = valStr.length;
+                }
+            });
+            colWidths.push({ wch: maxLen + 3 }); // Ancho de caracteres + margen de padding
+        }
+        ws['!cols'] = colWidths;
+    }
+
+    // 1. Prepare Summary Sheet
+    let totalRevenue = 0;
+    let cashTotal = 0;
+    let cardTotal = 0;
+    let transferTotal = 0;
+    let orderCount = 0;
+    let deliveredCount = 0;
+
+    const productBreakdown = {};
+
+    tickets.forEach(ticket => {
+        if (ticket.status === 'rechazado') return;
+        orderCount++;
+        totalRevenue += ticket.total;
+        
+        if (ticket.status === 'entregado') deliveredCount++;
+
+        const method = (ticket.paymentMethod || 'Efectivo').toLowerCase();
+        if (method.includes('efectivo')) {
+            cashTotal += ticket.total;
+        } else if (method.includes('tarjeta') || method.includes('terminal')) {
+            cardTotal += ticket.total;
+        } else {
+            transferTotal += ticket.total;
+        }
+
+        ticket.items.forEach(item => {
+            if (!productBreakdown[item.name]) {
+                productBreakdown[item.name] = { qty: 0, total: 0 };
+            }
+            productBreakdown[item.name].qty += item.qty;
+            productBreakdown[item.name].total += item.total;
+        });
+    });
+
+    const summaryData = [
+        ["EL PUESTO DE DON JUAN - RESUMEN DE VENTAS DEL TURNO"],
+        ["Fecha de Exportación:", new Date().toLocaleString()],
+        [],
+        ["Métrica", "Valor"],
+        ["Total de Ventas", totalRevenue],
+        ["Pedidos Realizados", orderCount],
+        ["Pedidos Entregados", deliveredCount],
+        ["Promedio de Compra", orderCount > 0 ? totalRevenue / orderCount : 0],
+        [],
+        ["Desglose de Métodos de Pago", "Total"],
+        ["Efectivo", cashTotal],
+        ["Tarjeta (Terminal)", cardTotal],
+        ["Transferencia", transferTotal]
+    ];
+
+    // 2. Prepare Tickets Sheet
+    const ticketsData = [
+        ["Número", "Cliente", "Fecha", "Método de Pago", "Estado", "Total"]
+    ];
+    tickets.forEach(t => {
+        const d = new Date(t.date);
+        ticketsData.push([
+            t.number,
+            t.customer,
+            d.toLocaleDateString() + ' ' + d.toLocaleTimeString(),
+            t.paymentMethod || 'Efectivo',
+            t.status,
+            t.total
+        ]);
+    });
+
+    // 3. Prepare Products Sheet
+    const productsData = [
+        ["Producto", "Cantidad Vendida", "Total Recaudado"]
+    ];
+    Object.keys(productBreakdown).forEach(name => {
+        productsData.push([
+            name,
+            productBreakdown[name].qty,
+            productBreakdown[name].total
+        ]);
+    });
+
+    // Create sheets using SheetJS
+    const wb = XLSX.utils.book_new();
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+    const wsTickets = XLSX.utils.aoa_to_sheet(ticketsData);
+    const wsProducts = XLSX.utils.aoa_to_sheet(productsData);
+
+    // Ajustar columnas automáticamente en cada pestaña
+    autoFitColumns(wsSummary, summaryData);
+    autoFitColumns(wsTickets, ticketsData);
+    autoFitColumns(wsProducts, productsData);
+
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen del Turno");
+    XLSX.utils.book_append_sheet(wb, wsTickets, "Tickets Detallados");
+    XLSX.utils.book_append_sheet(wb, wsProducts, "Desglose Productos");
+
+    // Save/Download Excel file
+    XLSX.writeFile(wb, `Ventas_Turno_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function handleExcelImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    document.getElementById('importExcelFileName').textContent = file.name;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            
+            // Let's grab the first sheet
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            // Convert worksheet to JSON (as arrays)
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            if (jsonData.length === 0) {
+                alert("El archivo Excel está vacío.");
+                return;
+            }
+
+            renderImportPreview(jsonData);
+        } catch (error) {
+            console.error("Error al leer el archivo Excel:", error);
+            alert("No se pudo leer el archivo Excel. Asegúrate de que sea un archivo válido.");
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function renderImportPreview(data) {
+    const headerEl = document.getElementById('importExcelTableHeader');
+    const bodyEl = document.getElementById('importExcelTableBody');
+    const container = document.getElementById('importExcelPreviewContainer');
+
+    headerEl.innerHTML = '';
+    bodyEl.innerHTML = '';
+
+    if (data.length > 0) {
+        // Assume first row is header
+        const headers = data[0];
+        const headerRow = document.createElement('tr');
+        headers.forEach(h => {
+            const th = document.createElement('th');
+            th.textContent = h || '';
+            th.style.padding = '8px';
+            th.style.borderBottom = '2px solid var(--border-color)';
+            th.style.fontWeight = 'bold';
+            headerRow.appendChild(th);
+        });
+        headerEl.appendChild(headerRow);
+
+        // Populate body rows
+        for (let i = 1; i < data.length; i++) {
+            const rowData = data[i];
+            if (!rowData || rowData.length === 0 || rowData.every(cell => cell === null || cell === "")) continue;
+
+            const tr = document.createElement('tr');
+            rowData.forEach(cell => {
+                const td = document.createElement('td');
+                td.textContent = cell !== undefined && cell !== null ? cell : '';
+                td.style.padding = '6px 8px';
+                td.style.borderBottom = '1px solid var(--border-color)';
+                tr.appendChild(td);
+            });
+            bodyEl.appendChild(tr);
+        }
+        
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+function saveGoogleSheetId() {
+    const sheetId = document.getElementById('googleSheetId').value.trim();
+    if (!sheetId) {
+        alert("Por favor ingresa un ID de Google Sheet válido.");
+        return;
+    }
+    localStorage.setItem('donjuan_google_sheet_id', sheetId);
+    updateGoogleSheetIframe(sheetId);
+    alert("ID de Google Sheet guardado.");
+}
+
+function saveGoogleAppScriptUrl() {
+    const scriptUrl = document.getElementById('googleAppScriptUrl').value.trim();
+    localStorage.setItem('donjuan_google_script_url', scriptUrl);
+    alert("URL de Google Apps Script guardada.");
+}
+
+function updateGoogleSheetIframe(sheetId) {
+    const iframe = document.getElementById('googleSheetIframe');
+    const previewSection = document.getElementById('sheetsPreviewSection');
+    const iframeContainer = document.getElementById('sheetsIframeContainer');
+    
+    if (sheetId) {
+        iframe.src = `https://docs.google.com/spreadsheets/d/${sheetId}/htmlembed?widget=true&headers=false`;
+        previewSection.style.display = 'block';
+        iframeContainer.style.display = 'block';
+    } else {
+        iframe.src = '';
+        previewSection.style.display = 'none';
+    }
+}
+
+function fetchGoogleSheetCsv() {
+    const csvUrl = document.getElementById('googleSheetCsvUrl').value.trim();
+    if (!csvUrl) {
+        alert("Por favor ingresa una URL de CSV publicada válida.");
+        return;
+    }
+    localStorage.setItem('donjuan_google_csv_url', csvUrl);
+
+    fetch(csvUrl)
+        .then(response => {
+            if (!response.ok) throw new Error("Error al obtener el CSV");
+            return response.text();
+        })
+        .then(csvText => {
+            parseAndRenderCsv(csvText);
+        })
+        .catch(err => {
+            console.error("Error cargando el CSV de Google Sheets:", err);
+            alert("No se pudo cargar el CSV. Asegúrate de haber publicado la hoja correctamente y de que la URL sea la de formato CSV.");
+        });
+}
+
+function parseAndRenderCsv(csvText) {
+    const rows = csvText.split('\n').map(row => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < row.length; i++) {
+            const char = row[i];
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        result.push(current.trim());
+        return result;
+    });
+
+    const headerEl = document.getElementById('csvTableHeader');
+    const bodyEl = document.getElementById('csvTableBody');
+    const container = document.getElementById('csvTableContainer');
+
+    headerEl.innerHTML = '';
+    bodyEl.innerHTML = '';
+
+    if (rows.length > 0) {
+        const headers = rows[0];
+        const headerRow = document.createElement('tr');
+        headers.forEach(h => {
+            const th = document.createElement('th');
+            th.textContent = h.replace(/^"|"$/g, '') || '';
+            th.style.padding = '8px';
+            th.style.borderBottom = '2px solid var(--border-color)';
+            th.style.fontWeight = 'bold';
+            headerRow.appendChild(th);
+        });
+        headerEl.appendChild(headerRow);
+
+        for (let i = 1; i < rows.length; i++) {
+            const rowData = rows[i];
+            if (!rowData || rowData.length === 0 || rowData.every(cell => cell === "")) continue;
+
+            const tr = document.createElement('tr');
+            rowData.forEach(cell => {
+                const td = document.createElement('td');
+                td.textContent = cell.replace(/^"|"$/g, '') || '';
+                td.style.padding = '6px 8px';
+                td.style.borderBottom = '1px solid var(--border-color)';
+                tr.appendChild(td);
+            });
+            bodyEl.appendChild(tr);
+        }
+        container.style.display = 'block';
+        document.getElementById('sheetsPreviewSection').style.display = 'block';
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+function setupSalesTabs() {
+    const tabs = document.querySelectorAll('.sales-modal .tab-btn');
+    const contents = document.querySelectorAll('.sales-modal .tab-content');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetTab = tab.id.replace('btn-', '');
+
+            // Deactivate all tabs and contents
+            tabs.forEach(t => {
+                t.classList.remove('active');
+                t.style.borderBottom = '3px solid transparent';
+                t.style.color = 'var(--text-light)';
+                t.style.fontWeight = 'normal';
+            });
+            contents.forEach(c => c.style.display = 'none');
+
+            // Activate current tab and content
+            tab.classList.add('active');
+            tab.style.borderBottom = '3px solid var(--primary-color)';
+            tab.style.color = 'var(--text-color)';
+            tab.style.fontWeight = 'bold';
+            
+            const targetEl = document.getElementById(targetTab);
+            if (targetEl) {
+                targetEl.style.display = 'block';
+            }
+        });
+    });
+}
+
+function loadSheetsConfig() {
+    const savedSheetId = localStorage.getItem('donjuan_google_sheet_id');
+    if (savedSheetId) {
+        const sheetIdInput = document.getElementById('googleSheetId');
+        if (sheetIdInput) sheetIdInput.value = savedSheetId;
+        updateGoogleSheetIframe(savedSheetId);
+    }
+
+    const savedScriptUrl = localStorage.getItem('donjuan_google_script_url');
+    if (savedScriptUrl) {
+        const scriptUrlInput = document.getElementById('googleAppScriptUrl');
+        if (scriptUrlInput) scriptUrlInput.value = savedScriptUrl;
+    }
+
+    const savedCsvUrl = localStorage.getItem('donjuan_google_csv_url');
+    if (savedCsvUrl) {
+        const csvUrlInput = document.getElementById('googleSheetCsvUrl');
+        if (csvUrlInput) csvUrlInput.value = savedCsvUrl;
+        
+        // Cargar el CSV automáticamente en segundo plano si está configurado
+        fetch(savedCsvUrl)
+            .then(res => {
+                if (res.ok) return res.text();
+                throw new Error();
+            })
+            .then(csvText => parseAndRenderCsv(csvText))
+            .catch(() => console.log("No se pudo auto-cargar el CSV de Google Sheets."));
+    }
+}
+
 // Start
 // Initialize Firebase first so it's available for either branch
 initFirebase();
@@ -1084,6 +1709,17 @@ if (resumenData) {
         const resumenPaymentMethod = document.getElementById('resumenPaymentMethod');
         if (resumenPaymentMethod) {
             resumenPaymentMethod.textContent = ticketData.p || 'Efectivo';
+        }
+
+        const resumenTransferDetails = document.getElementById('resumenTransferDetails');
+        if (resumenTransferDetails) {
+            if (ticketData.p === 'Transferencia') {
+                resumenTransferDetails.style.display = 'block';
+                const conceptNumEl = resumenTransferDetails.querySelector('.transfer-concept-num');
+                if (conceptNumEl) conceptNumEl.textContent = ticketData.n;
+            } else {
+                resumenTransferDetails.style.display = 'none';
+            }
         }
 
         const itemsContainer = document.getElementById('resumenItems');

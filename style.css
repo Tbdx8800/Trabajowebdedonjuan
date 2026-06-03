@@ -535,6 +535,8 @@ button {
     border-radius: var(--radius-lg);
     width: 90%;
     max-width: 450px;
+    max-height: 90vh;
+    overflow-y: auto;
     position: relative;
     box-shadow: var(--shadow-lg);
     animation: modalScaleIn 0.3s ease;
@@ -834,5 +836,50 @@ button {
 }
 .admin-dropdown.show {
     display: flex !important;
+}
+
+/* Sales Modal & Tabs */
+.sales-modal .tab-btn {
+    transition: var(--transition);
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.sales-modal .tab-btn:hover {
+    color: var(--primary-color) !important;
+    background-color: rgba(196, 169, 129, 0.15) !important;
+}
+
+.sales-modal .tab-btn.active {
+    color: var(--primary-color) !important;
+    border-bottom: 3px solid var(--primary-color) !important;
+    font-weight: bold;
+}
+
+.sales-modal .tab-content {
+    animation: fadeIn 0.3s ease;
+}
+
+.sales-modal .metric-card h4 {
+    margin: 0;
+    letter-spacing: 0.5px;
+}
+
+.sales-modal table th, .sales-modal table td {
+    padding: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sales-modal table tr:last-child td {
+    border-bottom: none;
+}
+
+#salesProductBreakdownTable tr:hover, #importExcelTableBody tr:hover, #csvTableBody tr:hover {
+    background-color: rgba(196, 169, 129, 0.1);
+}
+
+#sheetsIframeContainer iframe {
+    transition: var(--transition);
 }
 
