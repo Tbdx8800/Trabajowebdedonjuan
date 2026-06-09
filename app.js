@@ -179,6 +179,101 @@ const loginUser = document.getElementById('loginUser');
 const loginPassword = document.getElementById('loginPassword');
 const loginError = document.getElementById('loginError');
 
+// Examen Elements
+const examenMenuToggleBtn = document.getElementById('examenMenuToggleBtn');
+const examenDropdownMenu = document.getElementById('examenDropdownMenu');
+const examenModal = document.getElementById('examenModal');
+const closeExamenModalBtn = document.getElementById('closeExamenModal');
+const closeExamenModalBtnOk = document.getElementById('closeExamenModalBtn');
+const prevStudentBtn = document.getElementById('prevStudentBtn');
+const nextStudentBtn = document.getElementById('nextStudentBtn');
+const examenModalTitle = document.getElementById('examenModalTitle');
+const examenModalBody = document.getElementById('examenModalBody');
+let currentStudentIndex = 0;
+
+const studentContributions = [
+    {
+        name: "Ulani Yolotzin",
+        color: "var(--accent-color)",
+        videoPlaceholder: `
+            <div class="examen-video-placeholder">
+                <div class="examen-video-placeholder-icon">🎥</div>
+                <h3 style="margin-bottom: 5px;">Video del Aporte de Ulani Yolotzin</h3>
+                <p class="examen-video-placeholder-text">Reemplaza esta sección con tu enlace de Canva, YouTube o archivo MP4 local</p>
+                <div style="font-size: 0.8rem; margin-top: 10px; font-family: monospace; opacity: 0.7;">
+                    &lt;iframe src="TU_URL_DE_EMBED"&gt;&lt;/iframe&gt;
+                </div>
+            </div>
+        `
+    },
+    {
+        name: "Nicolas de la Cruz Hernandez",
+        color: "var(--primary-color)",
+        videoPlaceholder: `
+            <div class="examen-video-placeholder">
+                <div class="examen-video-placeholder-icon">🎥</div>
+                <h3 style="margin-bottom: 5px;">Video del Aporte de Nicolas de la Cruz</h3>
+                <p class="examen-video-placeholder-text">Reemplaza esta sección con tu enlace de Canva, YouTube o archivo MP4 local</p>
+                <div style="font-size: 0.8rem; margin-top: 10px; font-family: monospace; opacity: 0.7;">
+                    &lt;iframe src="TU_URL_DE_EMBED"&gt;&lt;/iframe&gt;
+                </div>
+            </div>
+        `
+    },
+    {
+        name: "Huber Alexander Hernandez Guzman",
+        color: "#d94f04",
+        videoPlaceholder: `
+            <iframe loading="lazy" src="https://www.canva.com/design/DAHMDkPXyOo/j9BMVdYmJ8lRav71sVXpQw/watch?embed" allowfullscreen="allowfullscreen" allow="fullscreen"></iframe>
+        `
+    },
+    {
+        name: "Oswaldo Angel Alejo",
+        color: "var(--secondary-color)",
+        videoPlaceholder: `
+            <div class="examen-video-placeholder">
+                <div class="examen-video-placeholder-icon">🎥</div>
+                <h3 style="margin-bottom: 5px;">Video del Aporte de Oswaldo Angel</h3>
+                <p class="examen-video-placeholder-text">Reemplaza esta sección con tu enlace de Canva, YouTube o archivo MP4 local</p>
+                <div style="font-size: 0.8rem; margin-top: 10px; font-family: monospace; opacity: 0.7;">
+                    &lt;iframe src="TU_URL_DE_EMBED"&gt;&lt;/iframe&gt;
+                </div>
+            </div>
+        `
+    },
+    {
+        name: "Jose Arturo Perez",
+        color: "#25D366",
+        videoPlaceholder: `
+            <div class="examen-video-placeholder">
+                <div class="examen-video-placeholder-icon">🎥</div>
+                <h3 style="margin-bottom: 5px;">Video del Aporte de Jose Arturo Perez</h3>
+                <p class="examen-video-placeholder-text">Reemplaza esta sección con tu enlace de Canva, YouTube o archivo MP4 local</p>
+                <div style="font-size: 0.8rem; margin-top: 10px; font-family: monospace; opacity: 0.7;">
+                    &lt;iframe src="TU_URL_DE_EMBED"&gt;&lt;/iframe&gt;
+                </div>
+            </div>
+        `
+    }
+];
+
+function showStudentContribution(index) {
+    if (index < 0 || index >= studentContributions.length) return;
+    currentStudentIndex = index;
+    const student = studentContributions[index];
+
+    examenModalTitle.innerHTML = `<span style="color: ${student.color}">📝 Aporte de ${student.name}</span>`;
+    
+    examenModalBody.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 0.5rem; color: var(--secondary-color);">🎥 Demostración del Aporte:</div>
+        <div class="examen-video-container">
+            ${student.videoPlaceholder}
+        </div>
+    `;
+
+    examenModal.classList.add('show');
+}
+
 // Initialize Application
 async function initApp() {
     loadState();
@@ -367,6 +462,7 @@ function setupEventListeners() {
         adminMenuToggleBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             adminDropdownMenu.classList.toggle('show');
+            if (examenDropdownMenu) examenDropdownMenu.classList.remove('show');
         });
 
         // Close dropdown when clicking outside
@@ -505,6 +601,64 @@ function setupEventListeners() {
                 }
                 toggleEmbedBtn.textContent = 'Ver Hoja en Vivo (Iframe)';
             }
+        });
+    }
+
+    // Examen Dropdown Toggle
+    if (examenMenuToggleBtn && examenDropdownMenu) {
+        examenMenuToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            examenDropdownMenu.classList.toggle('show');
+            if (adminDropdownMenu) adminDropdownMenu.classList.remove('show');
+        });
+
+        // Close dropdown when clicking outside
+        window.addEventListener('click', (e) => {
+            if (examenDropdownMenu.classList.contains('show') && !document.getElementById('examenControls').contains(e.target)) {
+                examenDropdownMenu.classList.remove('show');
+            }
+        });
+
+        // Click handler for dropdown items
+        const examenDropdownBtns = examenDropdownMenu.querySelectorAll('.examen-dropdown-btn');
+        examenDropdownBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.student);
+                showStudentContribution(idx);
+                examenDropdownMenu.classList.remove('show');
+            });
+        });
+    }
+
+    // Modal navigation & closing
+    if (closeExamenModalBtn) {
+        closeExamenModalBtn.addEventListener('click', () => examenModal.classList.remove('show'));
+    }
+    if (closeExamenModalBtnOk) {
+        closeExamenModalBtnOk.addEventListener('click', () => examenModal.classList.remove('show'));
+    }
+    
+    // Close modal when clicking outside content area
+    if (examenModal) {
+        examenModal.addEventListener('click', (e) => {
+            if (e.target === examenModal) {
+                examenModal.classList.remove('show');
+            }
+        });
+    }
+    
+    if (prevStudentBtn) {
+        prevStudentBtn.addEventListener('click', () => {
+            let nextIndex = currentStudentIndex - 1;
+            if (nextIndex < 0) nextIndex = studentContributions.length - 1;
+            showStudentContribution(nextIndex);
+        });
+    }
+    if (nextStudentBtn) {
+        nextStudentBtn.addEventListener('click', () => {
+            let nextIndex = currentStudentIndex + 1;
+            if (nextIndex >= studentContributions.length) nextIndex = 0;
+            showStudentContribution(nextIndex);
         });
     }
 }

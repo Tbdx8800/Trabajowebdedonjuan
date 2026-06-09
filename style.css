@@ -883,3 +883,91 @@ button {
     transition: var(--transition);
 }
 
+/* Examen Dropdown & Modal Styles */
+.examen-dropdown-btn {
+    width: 100%;
+    text-align: left;
+    padding: 0.7rem 1rem;
+    background: none;
+    color: var(--text-color);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.examen-dropdown-btn:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.examen-video-container {
+    position: relative;
+    width: 100%;
+    height: 0;
+    padding-top: 56.25%; /* 16:9 aspect ratio */
+    margin: 1.2rem 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    background: #000;
+}
+
+.examen-video-container iframe,
+.examen-video-container video,
+.examen-video-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.examen-video-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--secondary-color), #502e1c);
+    color: #f7eedf;
+    padding: 20px;
+    text-align: center;
+}
+
+.examen-video-placeholder-icon {
+    font-size: 2.5rem;
+    margin-bottom: 8px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.examen-video-placeholder-text {
+    font-size: 0.9rem;
+    opacity: 0.85;
+}
+
+/* Header buttons uniform style */
+.header-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    padding: 0.6rem 1.4rem !important;
+    font-size: 0.95rem !important;
+    height: 42px !important;
+    white-space: nowrap !important;
+}
+
+
+
