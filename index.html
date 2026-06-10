@@ -21,20 +21,8 @@
                 <button id="howToUseBtn" class="btn-primary header-btn"
                     style="background-color: var(--accent-color);">❓ ¿Cómo usar?</button>
 
-                <!-- Menú Desplegable para Examen -->
-                <div id="examenControls" style="position: relative;">
-                    <button id="examenMenuToggleBtn" class="btn-primary header-btn"
-                        style="background-color: var(--primary-color);">
-                        📝 Examen
-                    </button>
-                    <div id="examenDropdownMenu" class="admin-dropdown" style="width: 320px;">
-                        <button class="examen-dropdown-btn" data-student="0">Aporte Ulani Yolotzin</button>
-                        <button class="examen-dropdown-btn" data-student="1">Aporte Nicolas de la Cruz Hernandez</button>
-                        <button class="examen-dropdown-btn" data-student="2">Aporte Huber Alexander Hernandez Guzman</button>
-                        <button class="examen-dropdown-btn" data-student="3">Aporte Oswaldo Angel Alejo</button>
-                        <button class="examen-dropdown-btn" data-student="4">Aporte Jose Arturo Perez</button>
-                    </div>
-                </div>
+                <button id="examenBtn" class="btn-primary header-btn"
+                    style="background-color: var(--primary-color);">📝 Examen</button>
 
                 <!-- Menú Desplegable para Administrador -->
                 <div id="adminControls" style="display: none; position: relative;">
@@ -573,21 +561,22 @@ function doPost(e) {
         </div>
     </div>
 
-    <!-- Modal de Examen (Aportes de Alumnos) -->
+    <!-- Modal de Examen -->
     <div id="examenModal" class="modal">
         <div class="modal-content modal-large" style="border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); max-width: 650px;">
             <span class="close-modal" id="closeExamenModal">&times;</span>
-            <h2 id="examenModalTitle" style="margin-bottom: 1.5rem; color: var(--secondary-color); display: flex; align-items: center; gap: 10px;">📝 Aporte</h2>
+            <h2 style="margin-bottom: 1.5rem; color: var(--secondary-color); display: flex; align-items: center; gap: 10px;">📝 Examen</h2>
             
-            <div id="examenModalBody" style="line-height: 1.6; color: var(--text-color); font-size: 1rem;">
-                <!-- Se inyecta dinámicamente -->
+            <div style="line-height: 1.6; color: var(--text-color); font-size: 1rem;">
+                <div style="font-weight: bold; margin-bottom: 0.5rem; color: var(--secondary-color); text-align: center;">🎥 Demostración del Proyecto:</div>
+                <div style="max-width: 340px; margin: 0 auto;">
+                    <div class="examen-video-container" style="padding-top: 177.7778%;">
+                        <iframe loading="lazy" src="https://www.canva.com/design/DAHMF6Ri0rQ/_V4_I7zFxNB-vfS-UvcyAQ/watch?embed" allowfullscreen="allowfullscreen" allow="fullscreen"></iframe>
+                    </div>
+                </div>
             </div>
             
-            <div style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px dashed var(--border-color); padding-top: 1.2rem; flex-wrap: wrap;">
-                <div>
-                    <button id="prevStudentBtn" class="btn-secondary" style="padding: 0.6rem 1.2rem; font-size: 0.9rem; margin-right: 5px;">◀ Anterior</button>
-                    <button id="nextStudentBtn" class="btn-secondary" style="padding: 0.6rem 1.2rem; font-size: 0.9rem;">Siguiente ▶</button>
-                </div>
+            <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; align-items: center; gap: 10px; border-top: 1px dashed var(--border-color); padding-top: 1.2rem; flex-wrap: wrap;">
                 <button id="closeExamenModalBtn" class="btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.9rem;">Cerrar</button>
             </div>
         </div>
